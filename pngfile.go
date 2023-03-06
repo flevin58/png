@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"log"
 	"os"
-	"strings"
 )
 
 // The PNG magic number at the beginning of all PNG files.
@@ -14,26 +13,23 @@ const (
 
 // The PNG file structure. Top level is just an array of chunks!
 type PngFile struct {
-	MagicNumber [8]byte
+	MagicNumber uint64
 	Chunks      []Chunk
 }
+
+var image PngFile
 
 // Read the PNG file and set the structure
 func (p *PngFile) Read(fileName string) {
 
 	f, err := os.Open(fileName)
-	if err != nil {
-		log.Fatalln("error opening file:", err)
-	}
+	AbortOnError(err, "opening file")
 	defer f.Close()
 
-	log.Println(strings.Repeat("-", 80))
-	log.Println("reading image file:", fileName)
-	buf8 := make([]byte, 8)
-	SafeBytesRead(f, buf8, "error reading magic number")
-	magicNum := binary.BigEndian.Uint64(buf8)
-	if magicNum != PNGSignature {
-		log.Fatalf("file %s not recognized as a PNG file\n", fileName)
+	err = binary.Read(f, binary.BigEndian, &p.MagicNumber)
+	AbortOnError(err, "reading png magic number")
+	if p.MagicNumber != PNGSignature {
+		Error("file %s not recognized as a PNG file\n", fileName)
 	}
 
 	var ch Chunk = Chunk{}
@@ -41,12 +37,14 @@ func (p *PngFile) Read(fileName string) {
 	for ch.Type != IEND {
 		ch.Read(f)
 		p.Chunks = append(p.Chunks, ch)
-		log.Println(ch.String())
 	}
 }
 
 // Write the PNG struct to file
 func (p *PngFile) Write(fileName string) {
+
+	log.Println("writing image file:", fileName)
+
 	f, err := os.Create(fileName)
 	if err != nil {
 		log.Fatalf("error opening %v for save: %v\n", fileName, err)
@@ -57,4 +55,13 @@ func (p *PngFile) Write(fileName string) {
 	for _, ch := range p.Chunks {
 		ch.Write(f)
 	}
+}
+
+func (p *PngFile) FindChunk(chunkType uint32) *Chunk {
+	for _, ch := range p.Chunks {
+		if ch.Type == chunkType {
+			return &ch
+		}
+	}
+	return nil
 }

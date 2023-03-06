@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
-	"log"
 	"os"
 )
 
@@ -53,6 +52,12 @@ type ChIHDR struct {
 	InterlaceMethod   byte
 }
 
+func (ch *Chunk) StrType() string {
+	bs := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bs, ch.Type)
+	return string(bs)
+}
+
 func (ch *Chunk) String() string {
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, ch.Type)
@@ -66,22 +71,14 @@ func (ch *Chunk) Read(f *os.File) {
 
 	// Read chunk from file
 	err = binary.Read(f, binary.BigEndian, &ch.Length)
-	if err != nil {
-		log.Fatalf("reading length: %v", err)
-	}
+	AbortOnError(err, "reading length: %v", err)
 	err = binary.Read(f, binary.LittleEndian, &ch.Type)
-	if err != nil {
-		log.Fatalf("reading type: %v", err)
-	}
+	AbortOnError(err, "reading type: %v", err)
 	ch.Data = make([]byte, ch.Length)
 	err = binary.Read(f, binary.LittleEndian, ch.Data)
-	if err != nil {
-		log.Fatalf("reading data: %v", err)
-	}
+	AbortOnError(err, "reading data: %v", err)
 	err = binary.Read(f, binary.BigEndian, &ch.CRC)
-	if err != nil {
-		log.Fatalf("reading crc: %v", err)
-	}
+	AbortOnError(err, "reading crc: %v", err)
 
 	// Check CRC
 	var (
@@ -93,8 +90,7 @@ func (ch *Chunk) Read(f *os.File) {
 	crc = crc32.Update(crc, crc32.IEEETable, buf4)
 	crc = crc32.Update(crc, crc32.IEEETable, ch.Data)
 	if ch.CRC != crc {
-		log.Println(ch.String())
-		log.Fatalf("crc error: expected %08X, calculated %08X", ch.CRC, crc)
+		Error("bad crc in chunk '%s': expected %08X, calculated %08X", ch.StrType(), ch.CRC, crc)
 	}
 }
 
