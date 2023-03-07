@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -15,8 +16,51 @@ func doCopy(inf interface{}) {
 	image.Write(args.Ofile)
 }
 
+func doBinaryDump(chType string) {
+
+	var (
+		ascii  string
+		char   byte
+		i, j   uint32
+		offset uint32
+	)
+
+	ch := image.FindChunk(ChunkStringToUint32(chType))
+	if ch == nil {
+		Error("chunk type '%s' not found\n", chType)
+	}
+
+	fmt.Printf("Dumping chunk '%s' of length %d\n\n", chType, ch.Length)
+	for i = 0; i < ch.Length; i += 16 {
+		ascii = ""
+		fmt.Printf("%08X:  ", i)
+		for j = 0; j < 16; j++ {
+			offset = i + j
+			if offset >= ch.Length {
+				fmt.Print("-- ")
+				ascii += "."
+				continue
+			}
+
+			char = ch.Data[offset]
+			fmt.Printf("%02X ", char)
+			if char <= 32 || char >= 127 {
+				ascii += "."
+			} else {
+				ascii += string(char)
+			}
+		}
+		fmt.Println("  ", ascii)
+	}
+}
+
 func doDumpHeader() {
-	var header ChIHDR = ChIHDR{}
+	var (
+		header   ChIHDR = ChIHDR{}
+		cmString string
+		fmString string
+		imString string
+	)
 
 	ch := image.FindChunk(IHDR)
 	if ch == nil {
@@ -30,17 +74,66 @@ func doDumpHeader() {
 	buffer.Seek(0, io.SeekStart)
 	binary.Read(buffer, binary.BigEndian, &header.Width)
 	binary.Read(buffer, binary.BigEndian, &header.Height)
+	header.BitDepth, _ = buffer.ReadByte()
+	header.ColourType, _ = buffer.ReadByte()
+	header.CompressionMethod, _ = buffer.ReadByte()
+	if header.CompressionMethod == 0 {
+		cmString = "Deflate/inflate compression with a 32K sliding window."
+	} else {
+		cmString = "Unknown"
+	}
+	header.FilterMethod, _ = buffer.ReadByte()
+	if header.CompressionMethod == 0 {
+		fmString = "Adaptive filtering with five basic filter types."
+	} else {
+		fmString = "Unknown"
+	}
+	header.InterlaceMethod, _ = buffer.ReadByte()
+	switch header.InterlaceMethod {
+	case 0:
+		imString = "No interlace."
+	case 1:
+		imString = "Adam7 interlace."
+	default:
+		imString = "Unknown"
+	}
 
 	fmt.Printf("Size..............: %d x %d\n", header.Width, header.Height)
-	fmt.Printf("Bit depth.........: %d\n", header.BitDepth)
-	fmt.Printf("Colour type.......: %d\n", header.ColourType)
-	fmt.Printf("Compression method: %d\n", header.CompressionMethod)
-	fmt.Printf("Filter method.....: %d\n", header.FilterMethod)
-	fmt.Printf("Interlace method..: %d\n", header.InterlaceMethod)
+	fmt.Printf("Bit depth.........: %d (Values range from 0 to %d)\n", header.BitDepth, uint(math.Pow(2, float64(header.BitDepth)))-1)
+	fmt.Printf("Colour type.......: %d (%s)\n", header.ColourType, ColorTypes[header.ColourType])
+	fmt.Printf("Compression method: %d (%s)\n", header.CompressionMethod, cmString)
+	fmt.Printf("Filter method.....: %d (%s)\n", header.FilterMethod, fmString)
+	fmt.Printf("Interlace method..: %d (%s)\n", header.InterlaceMethod, imString)
 }
 
 func doDumpPalette() {
-	Abort("TODO: dump PLTE chunk\n")
+	ch := image.FindChunk(PLTE)
+	if ch == nil {
+		Error("chunk type '%s' not found", ch.StrType())
+	}
+
+	if ch.Length%3 != 0 {
+		Error("palette length %d is not multiple of 3 (r,g,b)\n", ch.Length)
+	}
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetTitle("Color Palette")
+	t.AppendHeader(table.Row{"#", "R", "G", "B", "Hex"})
+	for i, j := 0, 0; i < int(ch.Length); i += 3 {
+		t.AppendRow([]interface{}{
+			j,
+			ch.Data[i],
+			ch.Data[i+1],
+			ch.Data[i+2],
+			fmt.Sprintf("#%02X%02X%02X", ch.Data[i], ch.Data[i+1], ch.Data[i+2]),
+		})
+		t.AppendSeparator()
+		j++
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
 }
 
 func doDumpAll() {
@@ -70,8 +163,9 @@ func doDump(inf interface{}) {
 	case "IHDR":
 		doDumpHeader()
 	case "PLTE":
+		doBinaryDump(args.Chunk)
 		doDumpPalette()
 	default:
-		Error("unrecognized or unsupported chunk: %v\n", args.Chunk)
+		doBinaryDump(args.Chunk)
 	}
 }

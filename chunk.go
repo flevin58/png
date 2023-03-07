@@ -1,4 +1,5 @@
 // Convert struct to bytes and viceversa
+// Ref: https://www.w3.org/TR/PNG-Chunks.html
 
 package main
 
@@ -50,6 +51,33 @@ type ChIHDR struct {
 	CompressionMethod byte
 	FilterMethod      byte
 	InterlaceMethod   byte
+}
+
+type ChcHRM struct {
+	WhitePointx uint32
+	WhitePointy uint32
+	Redx        uint32
+	Redy        uint32
+	Greenx      uint32
+	Greeny      uint32
+	Bluex       uint32
+	Bluey       uint32
+}
+
+var ColorTypes []string = []string{
+	"Each pixel is a grayscale sample.",
+	"Undefined",
+	"Each pixel is an R,G,B triple.",
+	"Each pixel is a palette index, a PLTE chunk must appear.",
+	"Each pixel is a grayscale sample followed by an alpha sample.",
+	"Undefined",
+	"Each pixel is an R,G,B triple followed by an alpha sample.",
+}
+
+func ChunkStringToUint32(chType string) uint32 {
+	var bs []byte = []byte(chType)
+	var result uint32 = uint32(bs[0]) + uint32(bs[1])<<8 + uint32(bs[2])<<16 + uint32(bs[3])<<24
+	return result
 }
 
 func (ch *Chunk) StrType() string {
