@@ -4,13 +4,15 @@
 
 package main
 
+import "github.com/flevin58/png/cmds"
+
 func main() {
 	// Parse the args and copy the file
-	subcmd, args := ParseCommandLine()
+	subcmd, args := cmds.ParseCommandLine()
 	switch subcmd {
 	case "copy":
-		doCopy(args)
+		cmds.DoCopy(args)
 	case "dump":
-		doDump(args)
+		cmds.DoDump(args)
 	}
 }

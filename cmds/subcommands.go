@@ -1,4 +1,4 @@
-package main
+package cmds
 
 import (
 	"encoding/binary"
@@ -7,10 +7,15 @@ import (
 	"math"
 	"os"
 
+	"github.com/flevin58/png/bytesrw"
+	"github.com/flevin58/png/errors"
+	"github.com/flevin58/png/pngfile"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-func doCopy(inf interface{}) {
+var image pngfile.PngType
+
+func DoCopy(inf interface{}) {
 	args := inf.(*CmdCopy)
 	image.Read(args.Ifile)
 	image.Write(args.Ofile)
@@ -25,9 +30,9 @@ func doBinaryDump(chType string) {
 		offset uint32
 	)
 
-	ch := image.FindChunk(ChunkStringToUint32(chType))
+	ch := image.FindChunk(pngfile.ChunkStringToUint32(chType))
 	if ch == nil {
-		Error("chunk type '%s' not found\n", chType)
+		errors.Error("chunk type '%s' not found\n", chType)
 	}
 
 	fmt.Printf("Dumping chunk '%s' of length %d\n\n", chType, ch.Length)
@@ -56,21 +61,20 @@ func doBinaryDump(chType string) {
 
 func doDumpHeader() {
 	var (
-		header   ChIHDR = ChIHDR{}
+		header   pngfile.ChIHDR
 		cmString string
 		fmString string
 		imString string
 	)
 
-	ch := image.FindChunk(IHDR)
+	header = pngfile.ChIHDR{}
+
+	ch := image.FindChunk(pngfile.IHDR)
 	if ch == nil {
-		Error("chunk type '%s' not found", ch.StrType())
+		errors.Error("chunk type '%s' not found", ch.StrType())
 	}
 
-	buffer := &BytesReadWriteSeeker{
-		data: ch.Data,
-		pos:  0,
-	}
+	buffer := bytesrw.NewBytesReadWriteSeeker(ch.Data)
 	buffer.Seek(0, io.SeekStart)
 	binary.Read(buffer, binary.BigEndian, &header.Width)
 	binary.Read(buffer, binary.BigEndian, &header.Height)
@@ -100,20 +104,20 @@ func doDumpHeader() {
 
 	fmt.Printf("Size..............: %d x %d\n", header.Width, header.Height)
 	fmt.Printf("Bit depth.........: %d (Values range from 0 to %d)\n", header.BitDepth, uint(math.Pow(2, float64(header.BitDepth)))-1)
-	fmt.Printf("Colour type.......: %d (%s)\n", header.ColourType, ColorTypes[header.ColourType])
+	fmt.Printf("Colour type.......: %d (%s)\n", header.ColourType, pngfile.ColorTypes[header.ColourType])
 	fmt.Printf("Compression method: %d (%s)\n", header.CompressionMethod, cmString)
 	fmt.Printf("Filter method.....: %d (%s)\n", header.FilterMethod, fmString)
 	fmt.Printf("Interlace method..: %d (%s)\n", header.InterlaceMethod, imString)
 }
 
 func doDumpPalette() {
-	ch := image.FindChunk(PLTE)
+	ch := image.FindChunk(pngfile.PLTE)
 	if ch == nil {
-		Error("chunk type '%s' not found", ch.StrType())
+		errors.Error("chunk type '%s' not found", ch.StrType())
 	}
 
 	if ch.Length%3 != 0 {
-		Error("palette length %d is not multiple of 3 (r,g,b)\n", ch.Length)
+		errors.Error("palette length %d is not multiple of 3 (r,g,b)\n", ch.Length)
 	}
 
 	t := table.NewWriter()
@@ -153,7 +157,7 @@ func doDumpAll() {
 	t.Render()
 }
 
-func doDump(inf interface{}) {
+func DoDump(inf interface{}) {
 	args := inf.(*CmdDump)
 	image.Read(args.Ifile)
 

@@ -1,13 +1,15 @@
 // Convert struct to bytes and viceversa
 // Ref: https://www.w3.org/TR/PNG-Chunks.html
 
-package main
+package pngfile
 
 import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
 	"os"
+
+	"github.com/flevin58/png/errors"
 )
 
 /*
@@ -99,14 +101,14 @@ func (ch *Chunk) Read(f *os.File) {
 
 	// Read chunk from file
 	err = binary.Read(f, binary.BigEndian, &ch.Length)
-	AbortOnError(err, "reading length: %v", err)
+	errors.AbortOnError(err, "reading length: %v", err)
 	err = binary.Read(f, binary.LittleEndian, &ch.Type)
-	AbortOnError(err, "reading type: %v", err)
+	errors.AbortOnError(err, "reading type: %v", err)
 	ch.Data = make([]byte, ch.Length)
 	err = binary.Read(f, binary.LittleEndian, ch.Data)
-	AbortOnError(err, "reading data: %v", err)
+	errors.AbortOnError(err, "reading data: %v", err)
 	err = binary.Read(f, binary.BigEndian, &ch.CRC)
-	AbortOnError(err, "reading crc: %v", err)
+	errors.AbortOnError(err, "reading crc: %v", err)
 
 	// Check CRC
 	var (
@@ -118,7 +120,7 @@ func (ch *Chunk) Read(f *os.File) {
 	crc = crc32.Update(crc, crc32.IEEETable, buf4)
 	crc = crc32.Update(crc, crc32.IEEETable, ch.Data)
 	if ch.CRC != crc {
-		Error("bad crc in chunk '%s': expected %08X, calculated %08X", ch.StrType(), ch.CRC, crc)
+		errors.Error("bad crc in chunk '%s': expected %08X, calculated %08X", ch.StrType(), ch.CRC, crc)
 	}
 }
 

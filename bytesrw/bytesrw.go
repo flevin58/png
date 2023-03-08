@@ -1,4 +1,4 @@
-package main
+package bytesrw
 
 import (
 	"fmt"
@@ -10,6 +10,10 @@ import (
 type BytesReadWriteSeeker struct {
 	data []byte
 	pos  int
+}
+
+func NewBytesReadWriteSeeker(data []byte) *BytesReadWriteSeeker {
+	return &BytesReadWriteSeeker{data: data, pos: 0}
 }
 
 // Seek moves the pointer to the specified position.

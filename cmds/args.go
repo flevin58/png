@@ -1,4 +1,4 @@
-package main
+package cmds
 
 import (
 	"github.com/alexflint/go-arg"
